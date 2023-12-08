@@ -5,12 +5,25 @@ import {fileURLToPath} from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const ProblemHandler = () => {
+const problemHandler = (caller, callback, filenames = ['test.txt', 'data.txt']) => {
+
   const getData = (dayName, filename) => {
     const filePath = path.join(__dirname, '..', dayName, filename)
     return fs.readFile(filePath, 'utf8')
+    .then(s => s.split('\r\n'))
+    .then(d => removeTerminalReturn(d))
   }
-  const run = (dayName, filenames, callback) => {
+
+  const removeTerminalReturn = (d) => {
+    if(d.length === 0) return d;
+    if (d[d.length - 1] === '') d.pop()
+    return d;
+  }
+
+  const run = (caller, callback, filenames) => {
+    const splitName = caller.split('\\');
+    const dayName = splitName[splitName.length - 2]
+
     //TODO: Grab dayName here instead of passing it in
     console.log(`----- ${dayName} -----`)
     for (const filename of filenames) {
@@ -20,10 +33,8 @@ const ProblemHandler = () => {
       })
     }
   }
-  return {
-    getData,
-    run
-  }
+
+  return run(caller, callback, filenames)
 }
 
-export default ProblemHandler
+export default problemHandler

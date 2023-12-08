@@ -1,26 +1,103 @@
-import * as fs from "node:fs/promises"
-import * as path from "node:path"
 import {fileURLToPath} from 'url';
+import problemHandler from '../utils/problemHandler.js'
 
-// Not available in Modules
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
-console.log(`----- ${__filename} -----`)
+const buildDataObject = (data) => {
+  return data.map(d => {
+    const split = d.split(':')
+    const game = Number(split[0].replace('Game ',''))
 
-const processFile = async (filename) => {
+    const convertColorValues = (colorSplit, color) => {
+      return parseInt(colorSplit.find(i => i.includes(color))?.replace(color, '')) || 0;
+    }
+
+    const values = split[1].split(';').map(s => {
+      const colorSplit = s.split(',')
+      const red = convertColorValues(colorSplit, 'red')
+      const green = convertColorValues(colorSplit, 'green')
+      const blue = convertColorValues(colorSplit, 'blue')
+      return {
+        red,
+        green,
+        blue
+      }
+    })
+
+    return {
+      game,
+      values
+    }
+  })
+}
+
+const filterValidGames = (dataObject, parameters) => {
+  return dataObject.filter(d => {
+    const outOfBounds = d.values.find(values => {
+      for(const [key, value] of Object.entries(parameters)){
+        if(values[key] > value) {
+          return true
+        }
+      }
+    })
+
+    return !outOfBounds
+  })
+}
+
+const calculateMinimumCubes = (dataObject) => {
+  for(const data of dataObject){
+    const minimums = {
+      red: 0,
+      green: 0,
+      blue: 0
+    }
+
+    for(const colorValue of data.values) {
+      for (const [key, value] of Object.entries(colorValue)) {
+        minimums[key] = minimums[key] < value ? value : minimums[key]
+      }
+    }
+    data.minimums = minimums;
+  }
+  return dataObject
+}
+
+const calculateCubePower = (dataObject) => {
+  let cuberPowerTotal = 0;
+  for(const data of dataObject){
+    let cubePower = 1;
+    for(const [key, value] of Object.entries(data.minimums)){
+      cubePower *= value;
+    }
+    data.cubePower = cubePower;
+    cuberPowerTotal += cubePower;
+  }
+  dataObject.cuberPowerTotal = cuberPowerTotal
+  return dataObject;
+}
+
+const run = (data) => {
   const results = [];
-  const filePath = path.join(__dirname, filename)
-  const data = await fs.readFile(filePath, 'utf8')
-  results.push(getNumbers(data, new RegExp('(?=([0-9]))', 'g')));
-  results.push(getNumbers(data, new RegExp('(?=(one|two|three|four|five|six|seven|eight|nine|zero|[0-9]))', 'g')));
+  const dataObject = buildDataObject(data)
+
+  const parameters = {
+    red: 12,
+    green: 13,
+    blue: 14
+  }
+
+  const validGames = filterValidGames(dataObject, parameters)
+  const validGameIdSummation = validGames.reduce((prev, curr) => {
+    return prev + curr.game
+  }, 0)
+  results.push(validGameIdSummation)
+
+  calculateMinimumCubes(dataObject)
+  calculateCubePower(dataObject)
+  results.push(dataObject.cuberPowerTotal)
+
   return results;
 }
 
-
-export const run = async () => {
-  await processFile('test.txt').then(results => console.log('test:', results));
-  await processFile('data.txt').then(results => console.log('results:', results));
-}
-
-run();
+problemHandler(__filename, run)

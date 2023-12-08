@@ -1,12 +1,7 @@
 import {fileURLToPath} from 'url';
-import ProblemHandler from '../utils/ProblemHandler.js'
+import problemHandler from '../utils/problemHandler.js'
 
-// Not available in Modules
-const __filename = fileURLToPath(import.meta.url);
-
-const splitName = __filename.split('\\');
-const dayName = splitName[splitName.length - 2]
-
+const filename = fileURLToPath(import.meta.url);
 
 const getNumbers = (data, regExp) => {
 
@@ -19,7 +14,6 @@ const getNumbers = (data, regExp) => {
   }
 
   return data
-  .split('\r\n')
   .map(s => {
     if (!s) return null
 
@@ -44,7 +38,4 @@ const run = (data) => {
   return results;
 }
 
-
-const ph = ProblemHandler();
-ph.run(dayName, ['test.txt', 'data.txt'], run)
-
+problemHandler(filename, run)
