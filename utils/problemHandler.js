@@ -1,9 +1,5 @@
-import path from 'node:path';
-import fs from 'node:fs/promises';
-import {fileURLToPath} from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const path = require('node:path');
+const fs = require('node:fs/promises');
 
 const problemHandler = (caller, callback, filenames = ['test.txt', 'data.txt']) => {
 
@@ -37,4 +33,4 @@ const problemHandler = (caller, callback, filenames = ['test.txt', 'data.txt']) 
   return run(caller, callback, filenames)
 }
 
-export default problemHandler
+module.exports = problemHandler
