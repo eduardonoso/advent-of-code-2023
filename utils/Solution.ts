@@ -1,3 +1,6 @@
 interface Solution {
-    run(filenames: array): array
+    run(data: []): []
 }
+
+
+
