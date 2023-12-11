@@ -1,10 +1,10 @@
 const path = require('node:path');
 const fs = require('node:fs/promises');
 
-const problemHandler = (caller, callback, filenames = ['test.txt', 'data.txt']) => {
+const problemHandler = (caller, callback, filenames = ['test', 'data']) => {
 
   const getData = (dayName, filename) => {
-    const filePath = path.join(__dirname, '..', dayName, filename)
+    const filePath = path.join(__dirname, '..', dayName, `${filename}.txt`)
     return fs.readFile(filePath, 'utf8')
     .then(s => s.split('\r\n'))
     .then(d => removeTerminalReturn(d))
