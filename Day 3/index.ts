@@ -1,128 +1,132 @@
 const problemHandler = require('../utils/problemHandler.js')
 
-let cache = {};
-
-//If number
-//Find end of number
-//Check all spaces surrounding entire number spaces checking stored results first
-//If contains a non-period, non-number character then capture the number and store checked locations in cache
-//Sum all valid numbers
-function processData(data: string[]): number {
-    let result: number = 0
-    let extractedNumbers = [];
-    console.log(data)
-    for (let row = 0; row < data.length; row++) {
-        const rowData = data[row]
-        console.log('process Row', row, rowData)
-        for (let col = 0; col < rowData.length; col++) {
-            const char = rowData[col]
-             //console.log(char)
-
-            if (!isNumber(char)) continue
-
-            //Start of number found
-            //Iterate over all spaces
-            let extractedNumber = checkSurroundingSpaces(row, col, data, rowData)
-            if(!isNumber(extractedNumber)) continue
-
-            let moveAhead = extractedNumber.length
-            //Check behind
-            for (let xx = col - 1; xx >= 0; xx--) {
-                const prevChar = rowData[xx]
-                if (!isNumber(prevChar)) break
-                extractedNumber = prevChar + extractedNumber; //TODO: Make sure we dont need to coerce to string
-            }
-
-            //Move ahead
-            col += moveAhead
-            extractedNumbers.push(Number(extractedNumber))
-        }
-    }
-    console.log('extractedNumbers',extractedNumbers)
-    return extractedNumbers.reduce((prev, curr) => {
-        return prev + curr
-    });
-}
-
-function isNumber(char : string) {
-    const regExp = new RegExp('[0-9]','g')
-    return regExp.test(char);
-}
-
-function updateCache(data: {}) {
-    cache = {...cache, ...data}
-}
-
-function setCache(x: number, y: number, value: any) {
-    //console.log('setCache', x, y, value)
-    cache[`${x}:${y}` as keyof Object] = value
-}
-
-function getCache(x: number, y: number): any {
-    // console.log('getCache', x, y)
-    if (!cache.hasOwnProperty(`${x}:${y}` as keyof Object)) {
-        //console.log('cache not found')
-        return false
-    }
-    return cache[`${x}:${y}` as keyof Object]
-}
-
-function isSymbol(char: string): boolean {
-    //console.log('isSymbol', char, !isNumber(char) && char !== '.')
-    return !isNumber(char) && char !== '.'
-}
-
-function checkSurroundingSpaces(row: number, col: number, data: string[], rowData: string): string {
-    let extractedNumber = data[row][col]
-    let isValid = false;
-    for (let x = -1; x < 2; x++) {
-
-        if(isValid) break //TODO: I dont like this
-
-        for (let y = -1; y < 2; y++) {
-            if (x === 0 && y === 0) continue
-            const offsetX = col + x;
-            const offsetY = row + y;
-
-            if (offsetX < 0 || offsetX >= rowData.length) continue
-            if (offsetY < 0 || offsetY >= data.length) continue
-            const char = data[offsetY][offsetX];
-
-            console.log(`(${col}, ${row})`,`(${offsetX}, ${offsetY})`, data[offsetY][offsetX])
-
-
-            const hasSymbol: boolean = getCache(offsetX, offsetY) || isSymbol(char);
-            //console.log('hasSymbol', char, hasSymbol, getCache(offsetX, offsetY), isSymbol(char), hasSymbol)
-            setCache(offsetX, offsetY, hasSymbol)
-
-
-
-            //TODO: Need to walk full number and check all spaces
-
-            if (!hasSymbol) continue
-
-            //Find end of number
-            for (let xx = col + 1; xx < rowData.length; xx++) {
-                const nextChar = rowData[xx]
-                if (!isNumber(nextChar)) break
-                extractedNumber += nextChar; //TODO: Make sure we dont need to coerce to string
-            }
-
-            //console.log('extractedNumber', extractedNumber)
-            isValid = true;
-            break;
-        }
-    }
-    if(!isValid) extractedNumber = '';
-    console.log('extractedNumber', extractedNumber)
-    return extractedNumber
-}
+problemHandler(__filename, run)
 
 function run(data: []): number[] {
     const results: number[] = [];
-    const result = processData(data);
-    results.push(result)
+    let result = processData(data);
+    results.push(result.sumPartNumbers)
+    results.push(result.sumEnginePowers)
     return results;
 }
 
-problemHandler(__filename, run)
+function processData(data: string[]) {
+    const extractedNumbers: number[] = getPartNumbers(data);
+    const sumPartNumbers: number = extractedNumbers.reduce((prev, curr) => {
+        return prev + curr
+    }, 0);
+
+    const extractedGearNumbers: number[] = getGearNumbers(data);
+    const sumEnginePowers: number = extractedGearNumbers.reduce((prev, curr) => {
+        return prev + curr
+    }, 0);
+
+    return {
+        sumPartNumbers,
+        sumEnginePowers
+    }
+}
+
+function getPartNumbers(data: string[]) {
+    let extractedNumbers = [];
+    for (let row = 0; row < data.length; row++) {
+        const rowData = data[row]
+        for (let col = 0; col < rowData.length; col++) {
+            const char = rowData[col]
+
+            if (!isNumber(char)) continue
+
+            const fullNumber = getFullNumber(col, row, data);
+            const hasSymbol = checkSurroundingSpacesForSymbol(col, row, data, fullNumber)
+            if (hasSymbol) extractedNumbers.push(Number(fullNumber))
+
+            col += fullNumber.length
+        }
+    }
+    return extractedNumbers
+}
+
+function getGearNumbers(data: string[]) {
+    let extractedNumbers = [];
+    for (let row = 0; row < data.length; row++) {
+        const rowData = data[row]
+        for (let col = 0; col < rowData.length; col++) {
+            const char = rowData[col]
+
+
+            if (!containsSymbol(char, '*')) continue
+
+            const gearNumbers = checkSurroundingSpacesForGearNumbers(col, row, data)
+            if (gearNumbers.length > 1) extractedNumbers.push(Number(gearNumbers[0]) * Number(gearNumbers[1]))
+
+        }
+    }
+    return extractedNumbers
+}
+
+function checkSurroundingSpacesForSymbol(col: number, row: number, data: string[], fullNumber: string): boolean {
+    for (let x = -1; x <= 1 + fullNumber.length; x++) {
+        for (let y = -1; y <= 1; y++) {
+            const targetX = col + x;
+            const targetY = row + y;
+            if (targetX < 0 || targetX >= data[row].length) continue
+            if (targetY < 0 || targetY >= data.length) continue
+            const char = data[targetY][targetX];
+
+            if (!containsSymbol(char)) continue
+            return true
+        }
+    }
+    return false
+}
+
+function checkSurroundingSpacesForGearNumbers(col: number, row: number, data: string[]): number[] {
+    let numbers = []
+    for (let y = -1; y <= 1; y++) {
+        for (let x = -1; x <= 1; x++) {
+            const targetX = col + x;
+            const targetY = row + y;
+            if (targetX < 0 || targetX >=  data[row].length) continue
+            if (targetY < 0 || targetY >= data.length) continue
+            const char = data[targetY][targetX];
+
+            if (!isNumber(char)) continue
+            const fullNumber = getFullNumber(targetX, targetY, data)
+            numbers.push(Number(fullNumber))
+            //Move to end of full number
+            for (let i = targetX + 1; i <  data[row].length; i++) {
+                const nextChar = data[targetY][i]
+                if (!isNumber(nextChar)) break
+                x = i
+            }
+        }
+    }
+    return numbers
+}
+
+function isNumber(char: string) {
+    const regExp = new RegExp('[0-9]', 'g')
+    return regExp.test(char);
+}
+
+function containsSymbol(char: string, target: null | string = null): boolean {
+    if (target) return char === target
+    return !isNumber(char) && char !== '.'
+}
+
+function getFullNumber(col: number, row: number, data: string[]): string {
+    let fullNumber = data[row][col]
+    //Find end of number
+    for (let x = col + 1; x < data[row].length; x++) {
+        const nextChar = data[row][x]
+        if (!isNumber(nextChar)) break
+        fullNumber += nextChar;
+    }
+    //Find start of number
+    for (let x = col - 1; x >= 0; x--) {
+        const nextChar = data[row][x]
+        if (!isNumber(nextChar)) break
+        fullNumber = nextChar + fullNumber;
+    }
+    return fullNumber
+}
