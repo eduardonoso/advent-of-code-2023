@@ -1,12 +1,13 @@
 const path = require('node:path');
 const fs = require('node:fs/promises');
+const { EOL } = require('node:os');
 
 const problemHandler = (caller, callback, filenames = ['test', 'data']) => {
 
   const getData = (dayName, filename) => {
     const filePath = path.join(__dirname, '..', dayName, `${filename}.txt`)
     return fs.readFile(filePath, 'utf8')
-    .then(s => s.split('\r\n'))
+    .then(s => s.split(EOL))
     .then(d => removeTerminalReturn(d))
   }
 
@@ -17,7 +18,8 @@ const problemHandler = (caller, callback, filenames = ['test', 'data']) => {
   }
 
   const run = (caller, callback, filenames) => {
-    const splitName = caller.split('\\');
+    console.log('caller',caller)
+    const splitName = caller.split(path.sep);
     const dayName = splitName[splitName.length - 2]
 
     //TODO: Grab dayName here instead of passing it in
