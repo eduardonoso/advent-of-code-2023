@@ -96,7 +96,7 @@ function buildMapData(data: string[]): MapData {
     mapHeaders.forEach(header => {
         mapData[toCamelCase(header)].sort((a, b) => {
             if (a.destination < b.destination) return -1
-            if (b.destination < a.destination) return 1
+            if (a.destination > b.destination) return 1
             return 0
         })
     })
