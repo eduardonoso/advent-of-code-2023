@@ -1,6 +1,6 @@
 const problemHandler = require('../utils/problemHandler.js')
 
-problemHandler(__filename, run, ['test'])
+problemHandler(__filename, run, ['data'])
 
 function run(data: []): number[] {
     const results: number[] = [];
@@ -13,7 +13,8 @@ function run(data: []): number[] {
 interface MapRange {
     destination: number,
     source: number,
-    length: number
+    length: number,
+    offset: number
 }
 
 type MapData = {
@@ -30,10 +31,38 @@ const mapHeaders = [
     'humidity-to-location'
 ];
 
-let cache: any[] = []
-
 function processData(data: string[]) {
+    const startTime = new Date()
+    const mapData: MapData = buildMapData(data)
 
+    // Part 1
+    let lowestLocation = Infinity
+    mapData.seeds.forEach(s => {
+        let mappedValue = mapSeed(s, mapData)
+        lowestLocation = lowestLocation < mappedValue ? lowestLocation : mappedValue
+    })
+
+    // Part 2
+    let convertedRanges: { start: number, end: number }[] = [];
+    for (let i = 0; i < mapData.seeds.length; i += 2) {
+        convertedRanges.push({start: mapData.seeds[i], end: mapData.seeds[i] + mapData.seeds[i + 1]})
+    }
+    for (const header of mapHeaders.map(header => toCamelCase(header))) {
+        convertedRanges = convertToRange(convertedRanges, mapData[header], header)
+    }
+
+    const endTime = new Date()
+    const elapsed = endTime.getTime() - startTime.getTime()
+
+    console.log('Run time:', `${elapsed} ms`)
+
+    return {
+        lowestLocation,
+        lowestLocationSeedRange: convertedRanges[0].start
+    }
+}
+
+function buildMapData(data: string[]): MapData {
     const mapData: MapData = {
         seeds: [],
         seedToSoil: [],
@@ -55,13 +84,15 @@ function processData(data: string[]) {
                     const mapRange: MapRange = {
                         destination: Number(split[0]),
                         source: Number(split[1]),
-                        length: Number(split[2])
+                        length: Number(split[2]),
+                        offset: Number(split[0]) - Number(split[1])
                     };
                     (mapData[camelCase as keyof MapData] as MapRange[]).push(mapRange)
                 }
             }
         })
     })
+
     mapHeaders.forEach(header => {
         mapData[toCamelCase(header)].sort((a, b) => {
             if (a.destination < b.destination) return -1
@@ -69,117 +100,51 @@ function processData(data: string[]) {
             return 0
         })
     })
-    console.log('mapData', mapData);
 
-    let lowestLocation = Infinity
-    mapData.seeds.forEach(s => {
-        let mappedValue = mapSeed(s, mapData)
-        lowestLocation = lowestLocation < mappedValue ? lowestLocation : mappedValue
-    })
-
-    // Part 2
-
-    let sortedSeeds = [];
-    for (let i = 0; i < mapData.seeds.length; i += 2) {
-        sortedSeeds.push({start: mapData.seeds[i], end: mapData.seeds[i] + mapData.seeds[i + 1]})
-    }
-    sortedSeeds.sort((a, b) => {
-        if (a.start < b.start) return -1
-        if (a.start > b.start) return 1
-        return 0
-    })
-    console.log('sortedSeeds', sortedSeeds)
-
-    let lowestLocationSeedRange = Infinity
-    // for (let j = 0; j <= mapData.seeds.length; j += 2) {
-    //     for (let seed = mapData.seeds[j]; seed < mapData.seeds[j] + mapData.seeds[j + 1]; seed++) {
-    //         let mappedValue = cache[seed] || mapSeed(seed, mapData)
-    //         cache[seed] = mappedValue
-    //         if (mappedValue < lowestLocationSeedRange) lowestLocationSeedRange = mappedValue
-    //
-    //     }
-    // }
-
-    for (let location = 0; location < 100; location++) {
-        if(!isLocationValid(location, mapData)) continue
-        const seed = getSeedByLocation(location, mapData)
-        //console.log('getSeedByLocation', location, seed)
-        if (isSeedPresent(seed, mapData, sortedSeeds)) {
-            lowestLocationSeedRange = location;
-            console.log('BREAK', lowestLocationSeedRange, location)
-            break
-        }
-    }
-
-    // console.log('mapData', mapData)
-    console.log('cache', cache)
-
-    return {
-        lowestLocation,
-        lowestLocationSeedRange
-    }
+    return mapData
 }
 
-function isLocationValid(location: number, mapData: MapData){
-    let isLocationValid = false;
-    mapHeaders.slice().reverse().forEach(header => {
-        for(let mapRange of mapData[toCamelCase(header)]){
-            const isValid = location >= mapRange.destination && location < mapRange.destination + mapRange.length
-            console.log(`${header} isValid?`, location, mapRange, isValid)
-            if(isValid) return true
-
-        }
-    })
-    return isLocationValid
-}
-
-function isSeedPresent(seed: number, mapData: MapData, sortedSeeds: {start: number, end: number}[]) {
-    for (let j = 0; j < sortedSeeds.length; j++) {
-        let startSeed = sortedSeeds[j].start
-        let endSeed =  sortedSeeds[j].end
-        const inRange = seed >= startSeed && seed < endSeed
-        console.log('isSeedPresent', seed, startSeed, endSeed, inRange)
-        if(inRange) return true
-
-
-    }
-}
-
-function getSeedByLocation(location: number, mapData: MapData) {
-    let mappedValue = location;
-    for (let i = mapHeaders.length - 1; i >= 0; i--) {
-        const header = mapHeaders[i]
-        for (const mapRange of mapData[toCamelCase(header)]) {
-            if (mappedValue >= mapRange.source && mappedValue < mapRange.source + mapRange.length) {
-                mappedValue = mapRange.destination + (mappedValue - mapRange.source)
-                break
+function convertToRange(inputs: any, mapRanges: MapRange[], header: string) {
+    const outputs = []
+    // Iterate through all ranges for header
+    while (inputs.length > 0) {
+        const input = inputs.pop()
+        let mappingFound = false
+        for (const range of mapRanges) {
+            let overlapStart = Math.max(input.start, range.source)
+            let overlapEnd = Math.min(input.end, range.source + range.length)
+            //Intersection found
+            if (overlapStart < overlapEnd) {
+                const overlapRange = {
+                    start: overlapStart - range.source + range.destination,
+                    end: overlapEnd - range.source + range.destination
+                }
+                outputs.push(overlapRange)
+                mappingFound = true
+                //Need to test outer bounds not intersected with this range
+                if (input.start < overlapStart) {
+                    inputs.push({start: input.start, end: overlapStart})
+                }
+                if (input.end > overlapEnd) {
+                    inputs.push({start: overlapEnd, end: input.end})
+                }
             }
         }
+        // Pass through values without mappings
+        if (!mappingFound) outputs.push({start: input.start, end: input.end})
     }
-    return mappedValue
+    return outputs;
 }
 
-// function getLowestLocation(lowestLocationSeedRange: number, mapData: MapData, seed: number): number {
-//     //let mappedValue =  mapSeed(seed, mapData)
-//     let mappedValue = cache[seed] || mapSeed(seed, mapData)
-//     cache[seed] = mappedValue
-//     // console.log('getLowestLocation', cache[seed], seed)
-//     return lowestLocationSeedRange < mappedValue ? lowestLocationSeedRange : mappedValue
-// }
-
-function mapSeed(s: number, mapData: MapData) {
-    // console.log('----- map seed -----', s)
-    let mappedValue = s;
-    mapHeaders.forEach(header => {
-        const camelCase: string = toCamelCase(header)
-        for (const mapRange of mapData[camelCase]) {
-            if (mappedValue >= mapRange.source && mappedValue < mapRange.source + mapRange.length) {
-                mappedValue = mapRange.destination + (mappedValue - mapRange.source)
-                break
+function mapSeed(seed: number, mapData: MapData) {
+    return mapHeaders.map(header => toCamelCase(header)).reduce((prev, header) => {
+        for (const mapRange of mapData[header]) {
+            if (prev >= mapRange.source && prev < mapRange.source + mapRange.length) {
+                return mapRange.destination + (prev - mapRange.source)
             }
         }
-    })
-    return mappedValue
+        return prev
+    }, seed)
 }
 
 function toCamelCase(s: string): string {
